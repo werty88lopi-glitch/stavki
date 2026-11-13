@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калькулятор ставки</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1e1b4b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ставки">
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; max-width: 540px; margin: 0 auto; padding: 16px; line-height: 1.4; }
+  h1 { font-size: 20px; }
+  label { display: block; margin-top: 12px; font-size: 14px; }
+  input { width: 100%; box-sizing: border-box; padding: 10px; font-size: 16px; margin-top: 4px; border: 1px solid #888; border-radius: 8px; background: transparent; color: inherit; }
+  .hint { font-size: 12px; opacity: .7; margin-top: 2px; }
+  .card { border: 1px solid #888; border-radius: 12px; padding: 14px; margin-top: 16px; }
+  .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 15px; gap: 8px; }
+  .total { font-weight: bold; font-size: 17px; border-top: 1px solid #888; margin-top: 6px; padding-top: 8px; }
+  .big { font-size: 20px; font-weight: bold; text-align: center; margin: 6px 0; }
+  .ok { color: #2e7d32; }
+  .bad { color: #c62828; }
+  .warn { color: #ef6c00; }
+  .status { font-size: 15px; text-align: center; padding: 8px; border-radius: 8px; margin-top: 8px; }
+  .stale { color: #ef6c00; font-size: 13px; margin-top: 4px; }
+  button { margin-top: 8px; padding: 8px 14px; font-size: 14px; border-radius: 8px; border: 1px solid #888; background: transparent; color: inherit; cursor: pointer; }
+  body { background: linear-gradient(160deg, #0f172a, #1e1b4b 60%, #312e81); min-height: 100vh; color: #e2e8f0; }
+  h1 { font-size: 24px; background: linear-gradient(90deg, #a5b4fc, #f0abfc); -webkit-background-clip: text; background-clip: text; color: transparent; margin: 8px 0 12px; }
+  .card { background: rgba(255,255,255,.06); border: 1px solid rgba(165,180,252,.25); border-radius: 16px; padding: 16px; margin-top: 14px; backdrop-filter: blur(6px); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  .card > strong { display: block; font-size: 15px; color: #c7d2fe; margin-bottom: 4px; letter-spacing: .3px; }
+  label { color: #cbd5e1; }
+  input { background: rgba(15,23,42,.6); border: 1px solid rgba(148,163,184,.35); border-radius: 12px; color: #f8fafc; transition: border-color .2s, box-shadow .2s; }
+  input:focus { outline: none; border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129,140,248,.25); }
+  .hint { color: #94a3b8; }
+  .row { border-bottom: 1px dashed rgba(148,163,184,.2); padding: 7px 0; }
+  .row span:last-child { font-variant-numeric: tabular-nums; color: #f1f5f9; }
+  .total { border-top: 1px solid rgba(165,180,252,.4); font-size: 18px; color: #fff; }
+  .total span:last-child { background: linear-gradient(90deg, #a5b4fc, #f0abfc); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 800; }
+  .big { font-size: 18px; padding: 10px; border-radius: 12px; }
+  .ok { color: #86efac; background: rgba(34,197,94,.12); }
+  .bad { color: #fca5a5; background: rgba(239,68,68,.12); }
+  .status { border-radius: 12px; font-weight: 600; }
+  .status.ok { background: rgba(34,197,94,.18); color: #86efac; }
+  .status.warn { background: rgba(249,115,22,.18); color: #fdba74; }
+  .status.bad { background: rgba(239,68,68,.18); color: #fca5a5; }
+  button { background: linear-gradient(90deg, #6366f1, #a855f7); border: none; color: #fff; border-radius: 12px; font-weight: 600; box-shadow: 0 4px 14px rgba(99,102,241,.35); }
+  button:active { transform: scale(.98); }
+  .stale { color: #fdba74; }
+  .card > strong { color: #ffffff; font-size: 16px; }
+  .total span:last-child { background: none; -webkit-text-fill-color: #a7f3d0; color: #a7f3d0; font-size: 20px; font-weight: 800; }
+</style>
+</head>
+<body>
+
+<h1>Калькулятор ставки</h1>
+
+<div class="card">
+  <strong>Курсы</strong>
+  <label>Евро, ЦБ РФ: ₽ за 1 €
+    <input id="eur" type="number" step="0.01" value="100">
+  </label>
+  <div class="hint" id="eurInfo">Загрузка курса ЦБ…</div>
+  <button id="refreshEur">Обновить евро</button>
+
+  <label>Йена, АТБ: ₽ за 100 ¥
+    <input id="rate" type="number" step="0.01" value="60">
+  </label>
+  <div class="hint" id="rateInfo">Введите курс с сайта АТБ</div>
+  <div class="stale" id="rateStale"></div>
+  <button id="saveRate">Сохранить курс йены (сегодня)</button>
+</div>
+
+<label>Бюджет клиента, ₽
+  <input id="budget" type="number" step="1000" value="1500000">
+</label>
+
+<label>Ставка на аукционе, ¥
+  <input id="bid" type="number" step="10000" value="1000000">
+</label>
+
+<label>Год выпуска
+  <input id="year" type="number" step="1" value="2022">
+</label>
+
+<label>Объём двигателя, см³
+  <input id="volume" type="number" step="10" value="1500">
+</label>
+
+<label>Мощность, л.с.
+  <input id="hp" type="number" step="1" value="0">
+  <div class="hint">Льготный утильсбор только при мощности до 160 л.с. и объёме до 3000 см³ для личного ввоза</div>
+</label>
+
+<label>Утильсбор, если не льготный, ₽
+  <input id="utilManual" type="number" step="1000" value="0">
+  <div class="hint">Сумма из калькулятора брокера или ФТС</div>
+</label>
+
+<label>Расходы в Японии, ¥
+  <input id="jpFee" type="number" step="1000" value="204000">
+</label>
+
+<label>Услуги брокера, ₽
+  <input id="brokerFee" type="number" step="1000" value="45000">
+</label>
+
+<div class="card">
+  <strong>Проходной год</strong>
+  <div class="status" id="pass"></div>
+  <div class="hint">Проходной — авто старше 3 и до 5 лет. Возраст по году выпуска; месяц уточните у брокера.</div>
+</div>
+
+<div class="card">
+  <strong>Расчёт по введённой ставке</strong>
+  <div class="row"><span>Ставка пошлины</span><span id="rateOut">—</span></div>
+  <div class="row"><span>Стоимость авто на аукционе</span><span id="carYen">—</span></div>
+  <div class="row"><span>Стоимость авто в рублях</span><span id="carRub">—</span></div>
+  <div class="row"><span>Расходы по Японии, фрахт, СВХ</span><span id="jpRub">—</span></div>
+  <div class="row"><span>Пошлина, утильсбор, таможенный сбор</span><span id="taxOut">—</span></div>
+  <div class="row"><span>Оформление, СБГТС, ЭПТС</span><span id="brokerOut">—</span></div>
+  <div class="row total"><span>ИТОГО</span><span id="total">—</span></div>
+  <div class="big" id="verdict"></div>
+</div>
+
+
+<script>
+  const $ = id => document.getElementById(id);
+  const num = id => parseFloat($(id).value) || 0;
+  const fmt = n => Math.round(n).toLocaleString('ru-RU');
+  const DAY = 24 * 60 * 60 * 1000;
+
+  // ---- Курс евро с ЦБ (через сервер на Render), кэш на 24 часа ----
+  const LOCAL_URL = '/eur';
+
+  function fmtDate(ts) {
+    return new Date(ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function fetchEur() {
+    try {
+      const res = await fetch(LOCAL_URL);
+      if (!res.ok) throw new Error('сервер вернул ошибку ' + res.status);
+      const data = await res.json();
+      const eur = data.eur;
+      localStorage.setItem('eurRate', JSON.stringify({ value: eur, ts: Date.now() }));
+      $('eur').value = eur.toFixed(2);
+      $('eurInfo').textContent = 'Курс ЦБ на ' + fmtDate(Date.now());
+      calc();
+      return true;
+    } catch (e) {
+      $('eurInfo').textContent = 'Не удалось загрузить курс ЦБ (' + e.message + '). Введите вручную.';
+      return false;
+    }
+  }
+
+  async function updateEurIfNeeded(force, initial) {
+    const cached = JSON.parse(localStorage.getItem('eurRate') || 'null');
+    if (cached && initial) {
+      $('eur').value = cached.value.toFixed(2);
+      $('eurInfo').textContent = 'Курс ЦБ на ' + fmtDate(cached.ts);
+    }
+    if (force || !cached || Date.now() - cached.ts >= DAY) {
+      await fetchEur();
+    }
+  }
+
+  // ---- Курс йены с АТБ: вручную, сохраняется с датой ----
+  async function loadRate() {
+    const saved = JSON.parse(localStorage.getItem('jpyRate') || 'null');
+    if (saved) {
+      $('rate').value = saved.value;
+      $('rateInfo').textContent = 'Курс АТБ на ' + fmtDate(saved.ts);
+    }
+    if (!saved || Date.now() - saved.ts >= DAY) await fetchJpy();
+    checkRateStale();
+  }
+
+  async function fetchJpy() {
+    try {
+      const res = await fetch('/jpy');
+      if (!res.ok) throw new Error('сервер вернул ' + res.status);
+      const data = await res.json();
+      localStorage.setItem('jpyRate', JSON.stringify({ value: data.jpy, ts: Date.now() }));
+      $('rate').value = data.jpy;
+      $('rateInfo').textContent = 'Курс АТБ на ' + fmtDate(Date.now());
+      checkRateStale();
+      calc();
+    } catch (e) {
+      $('rateInfo').textContent = 'Не удалось загрузить курс АТБ (' + e.message + '). Введите вручную.';
+    }
+  }
+
+  function checkRateStale() {
+    const saved = JSON.parse(localStorage.getItem('jpyRate') || 'null');
+    if (!saved || Date.now() - saved.ts >= DAY) {
+      $('rateStale').textContent = 'Курс йены устарел (больше 24 часов). Обновите с сайта АТБ.';
+    } else {
+      $('rateStale').textContent = '';
+    }
+  }
+
+  $('saveRate').addEventListener('click', () => {
+    localStorage.setItem('jpyRate', JSON.stringify({ value: num('rate'), ts: Date.now() }));
+    $('rateInfo').textContent = 'Курс АТБ сохранён ' + fmtDate(Date.now());
+    checkRateStale();
+  });
+
+  $('refreshEur').addEventListener('click', () => updateEurIfNeeded(true));
+
+  // ---- Таблицы ----
+  // Авто 3–5 лет: €/см³ по объёму (верхняя граница объёма, ставка)
+  const T3_5 = [[1000,1.5],[1500,1.7],[1800,2.5],[2300,2.7],[3000,3.0],[Infinity,3.6]];
+  // Авто старше 5 лет: €/см³ по объёму
+  const T5p  = [[1000,3.0],[1500,3.2],[1800,3.5],[2300,4.8],[3000,5.0],[Infinity,5.7]];
+  // Авто до 3 лет: по таможенной стоимости в евро — ставка в % и минимум €/см³
+  const T_UNDER3 = [
+    { max: 8500,     pct: 0.54, min: 2.5 },
+    { max: 16700,    pct: 0.48, min: 3.5 },
+    { max: 42300,    pct: 0.48, min: 5.5 },
+    { max: 84500,    pct: 0.48, min: 7.5 },
+    { max: 169000,   pct: 0.48, min: 15 },
+    { max: Infinity, pct: 0.48, min: 20 },
+  ];
+  // Таможенный сбор, ₽ — по таможенной стоимости в рублях
+  const CUSTOMS = [[200000,1231],[450000,2462],[1200000,4924],[2700000,13541],[4200000,18465],[5500000,21344],[10000000,49240],[Infinity,73860]];
+
+  function perCc(table, vol) {
+    for (const [max, rate] of table) if (vol <= max) return rate;
+    return table[table.length-1][1];
+  }
+
+  function customsFee(valueRub) {
+    for (const [max, fee] of CUSTOMS) if (valueRub <= max) return fee;
+    return 73860;
+  }
+
+  // ---- Расчёт ----
+  function compute(bidYen) {
+    const rate = num('rate') / 100;   // ₽ за 1 ¥
+    const eur = num('eur');           // ₽ за 1 €
+    const vol = num('volume');
+    const jpFee = num('jpFee');
+    const broker = num('brokerFee');
+    const age = 2026 - num('year');
+    const hp = num('hp');
+    const lgota = hp > 0 && hp <= 160 && vol <= 3000;
+
+    const baseYen = bidYen + jpFee;
+    const baseRub = baseYen * rate;   // таможенная стоимость, ₽
+
+    let duty, rateText;
+    if (age < 3) {
+      const valueEur = baseRub / eur;
+      const band = T_UNDER3.find(b => valueEur <= b.max);
+      const dutyEur = Math.max(band.pct * valueEur, band.min * vol);
+      duty = dutyEur * eur;
+      rateText = `${Math.round(band.pct * 100)}% или не менее ${band.min} €/см³`;
+    } else {
+      const r = perCc(age <= 5 ? T3_5 : T5p, vol);
+      duty = r * vol * eur;
+      rateText = `${r} €/см³`;
+    }
+
+    const manualUtil = num('utilManual');
+    const util = manualUtil > 0 ? manualUtil : (lgota ? (age < 3 ? 3400 : 5200) : 0);
+    const customs = customsFee(baseRub);
+    const total = baseRub + duty + util + customs + broker;
+
+    return { baseYen, baseRub, duty, rateText, util, lgota, customs, broker, total };
+  }
+
+  function calc() {
+    const budget = num('budget');
+    const bid = num('bid');
+    const year = num('year');
+    const age = 2026 - year;
+    const rate = num('rate') / 100;
+
+    // Статус проходного года
+    let status, cls;
+    if (age < 3) { status = 'Непроходной: авто моложе 3 лет'; cls = 'warn'; }
+    else if (age <= 5) { status = 'Проходной: 3–5 лет'; cls = 'ok'; }
+    else { status = 'Непроходной: старше 5 лет'; cls = 'bad'; }
+    $('pass').className = 'status ' + cls;
+    $('pass').textContent = status;
+
+    if (num('eur') <= 0 || rate <= 0) {
+      $('total').textContent = '—';
+      $('verdict').className = 'big bad';
+      $('verdict').textContent = 'Введите курсы евро и йены';
+      return;
+    }
+
+    const c = compute(bid);
+    $('rateOut').textContent = c.rateText;
+    $('carYen').textContent = fmt(bid) + ' ¥';
+    $('carRub').textContent = fmt(bid * rate) + ' ₽';
+    $('jpRub').textContent = fmt(num('jpFee') * rate) + ' ₽';
+    $('taxOut').textContent = fmt(c.duty + c.util + c.customs) + ' ₽';
+    $('brokerOut').textContent = fmt(c.broker) + ' ₽';
+    $('total').textContent = fmt(c.total) + ' ₽';
+
+    $('verdict').textContent = '';
+
+  }
+
+  document.querySelectorAll('input').forEach(i => {
+    i.inputMode = 'decimal';
+    i.addEventListener('input', calc);
+  });
+
+  loadRate();
+  updateEurIfNeeded(false, true);
+  calc();
+
+  // Проверка раз в час: обновить евро, если прошли сутки, и напомнить про йену
+  setInterval(() => {
+    updateEurIfNeeded(false);
+    const s = JSON.parse(localStorage.getItem('jpyRate') || 'null');
+    if (!s || Date.now() - s.ts >= DAY) fetchJpy();
+    checkRateStale();
+  }, 60 * 60 * 1000);
+</script>
+</body>
+</html>
